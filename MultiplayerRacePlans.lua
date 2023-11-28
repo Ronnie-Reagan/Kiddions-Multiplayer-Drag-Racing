@@ -61,6 +61,7 @@ local Flags = {
         HostReady = 1.03,
         HostWaiting = 1.04,
         HostYes = 1.05
+		HostNo = 1.06
         -- Add other flags as needed
     },
     JoinerFlags = {                                                                 -- Range: 1.51 - 2.00 
@@ -69,6 +70,8 @@ local Flags = {
         JoinerJoined = 1.53,
         JoinerReady = 1.54,
         JoinerSearching = 1.55
+		JoinerYes = 1.56
+		JoinerNo = 1.57
         -- Add other flags as needed
     }
 }
@@ -111,29 +114,66 @@ local Flags = {
 
 --                                          Initialization
 
-function Initialize()                                           -- shouldnt be needed
-    -- Initialize default settings
-    -- Open drag race menu
-    -- Set default distance and location
-end
+mainmenu = menu.add_submenu("MULTIPLAYER RACE")
+--Initialize default settings
+local systemdelay = 0.25
+local raceavailable = false
+local racerunning = false
+local racestarted = false
+local racefinished = false
+local playerishost = false
+local playerisjoiner = false
+local MYPED = localplayer:get_player_ped()
+
 
 --                                          Host Functionality
 
 function HostRace()                                             -- To be attached to "Host Race" submenu's "on open action"
-    local MYPED = localplayer:get_player_ped()                  -- get player ped (to be defined once in the real script)
+    playerisjoiner = false
+	playerishost = true
     MYPED:set_swim_speed(HostingOpen)                           -- Set the host flag to "Hosting Open"
-    RaceUnavailable = true                                      -- Disable race starting for host
+    raceavailable = false	                                    -- Disable race starting for host
+	Monitorforjoiner()											-- Search for player
 end
 
 function MonitorForJoiner()
-    -- Continuously check for "Joiner Searching" flag           -- tbd
-    HostAccepts()                                               -- If found, Do Host Accepts Function
+    while true do
+        local numberOfPlayers = player.get_number_of_players()
+        for i = 1, numberOfPlayers do
+            local playerPed = player.get_player_ped(i)
+            local playerSwimSpeed = playerPed:get_swim_speed()
+
+            if playerPed ~= nil and playerSwimSpeed == JoinerSearching then
+                local joinerId = playerPed:get_player_id()
+                HostAccepts(joinerId)  							-- Accept joiner and proceed
+                break
+            end
+        end
+        sleep(systemdelay)
+    end
 end
 
-function HostAccepts()
-    local MYPED = localplayer:get_player_ped()                  -- get player ped (to be defined once in the real script)
-    MYPED:set_swim_speed(HostAccepts)
-    -- Continuously monitor for "Joiner Joined" flag            -- tbd
+function HostAccepts(joinerId)
+    MYPED:set_swim_speed(HostAccepts) 							-- Set swim speed to indicate host acceptance
+    WaitForJoinerReady(joinerId) 								-- Pass the joiner's ID to the WaitForJoinerReady function
+end
+
+function WaitForJoinerReady(joinerId)
+    local joinerPed = player.get_player_ped(joinerId)
+    while true do
+        if joinerPed:get_swim_speed() == JoinerReady then
+            WaitForRaceStart()  								-- Wait for the host to start the race
+            break
+        end
+        sleep(systemdelay)
+    end
+end
+
+function WaitForRaceStart()
+    while not racestarted do
+        sleep(systemdelay)  									-- Loop until racestarted is set to true
+    end
+    StartRace()  												-- Start the race
 end
 
 function UpdateRaceStatus()                                     -- to be used for when a player leaves
@@ -148,16 +188,40 @@ end
 --                                              Joiner Functionality
 
 function SearchForRace()
-    -- Set searching flag
-    -- Look for available races (host flags)
+	playerishost = false
+	playerisjoiner = true
+	MYPED:set_swim_speed(JoinerSearching)
+    FindRaceHost()
 end
 
-function JoinRace()
-    -- Join available race
-    -- Set flags accordingly (e.g., Joiner Joined)
+function FindRaceHost()
+    while playerisjoiner do  -- Ensure this runs only if the player is a joiner
+        local numberOfPlayers = player.get_number_of_players()
+        for i = 1, numberOfPlayers do
+            local potentialHostPed = player.get_player_ped(i)
+            if potentialHostPed and potentialHostPed:get_swim_speed() == HostingOpen then
+                local hostId = potentialHostPed:get_player_id()
+                -- Pass the host's ID to the joiner's functions
+                JoinRace(hostId)
+                break
+            end
+        end
+        sleep(systemdelay)
+    end
+end
+
+function JoinRace(hostId)
+    -- Logic for joining an available race hosted by the player with hostId
+    MYPED:set_swim_speed(JoinerJoined)
+    PrepareForRace()
+end
+
+function Readyup()
+	MYPED:set_swim_speed(JoinerReady)
 end
 
 function PrepareForRace()
+	MYPED:set_swim_speed(JoinerBusy)
     -- Final preparations for joiner
     -- Synchronize with host's start
 end
