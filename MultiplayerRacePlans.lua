@@ -60,7 +60,7 @@ local Flags = {
         HostingOpen = 1.01,
         HostReady = 1.03,
         HostWaiting = 1.04,
-        HostYes = 1.05
+        HostYes = 1.05,
 		HostNo = 1.06
         -- Add other flags as needed
     },
@@ -69,8 +69,8 @@ local Flags = {
         JoinerFinished = 1.52,
         JoinerJoined = 1.53,
         JoinerReady = 1.54,
-        JoinerSearching = 1.55
-		JoinerYes = 1.56
+        JoinerSearching = 1.55,
+		JoinerYes = 1.56,
 		JoinerNo = 1.57
         -- Add other flags as needed
     }
