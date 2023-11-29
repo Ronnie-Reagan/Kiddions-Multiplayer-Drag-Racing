@@ -28,9 +28,8 @@ opponent's reaction time
 --                                              Data Stucture:
 
 local Flags = {
-    Utility = {                                                                     -- Range: 1.01 - 2.00
+    Utility = {                                                                     -- Default / unused for flags / non message
         Default = 1.00,
-        RaceStart = 1.01
     },
     Distance = {                                                                    -- Range: 2.01 - 2.10
         EighthMile = 2.01,
@@ -61,7 +60,8 @@ local Flags = {
         HostReady = 1.03,
         HostWaiting = 1.04,
         HostYes = 1.05,
-	HostNo = 1.06
+	    HostNo = 1.06,
+        RaceStart = 1.01
         -- Add other flags as needed
     },
     JoinerFlags = {                                                                 -- Range: 1.51 - 2.00 
@@ -70,8 +70,8 @@ local Flags = {
         JoinerJoined = 1.53,
         JoinerReady = 1.54,
         JoinerSearching = 1.55,
-	JoinerYes = 1.56,
-	JoinerNo = 1.57
+        JoinerYes = 1.56,
+        JoinerNo = 1.57
         -- Add other flags as needed
     }
 }
@@ -90,21 +90,23 @@ local Flags = {
     - Check for Joiner Searching flag	
 4. Host Accepts (Once Joiner Found)                                             2. Join Race (Once Host Accepts)
     - Set host flag to Host Accepts                                                 - Set joiner flag to Joiner Joined
-    - Monitor for Joiner Joined flag                                                - Wait for RaceAvailable to be true
+    - Monitor for Joiner Joined flag                                                - Wait for HostReady to be true
 5. Wait for Joiner to be Ready                                                  3. Prepare for Race
     - Monitor for "Joiner Ready" flag                                               - Set joiner flag to Joiner Ready
     - Once Joiner Ready detected,                                                   - Wait for race start signal
     - Set RaceAvailable to true	
 6. Start Race	                                                                4. Start Race (Upon Host's Signal)
     - Set host flag to Race Started                                                 - Begin race loop upon host's start
-    - Begin race loop	
+    - Begin race loop after delay to sync
 7. Race Loop                                                                    5. Race Loop
     - Monitor race progress                                                         - Monitor race progress
     - Handle in-race events                                                         - Handle in-race events
 8. Post-Race                                                                    6. Post-Race
-    - Handle race results                                                           - Receive race results
+    - Receive Joiner results                                                        - Send results inc. all player info
+    - compile, save and send race results                                           - Receive compiled race results
     - Offer rematch option                                                          - Decide on rematch option
-    - Set RaceAvailable to false if no rematch	
+    - if rematch = true go to 5                                                     - if rematch = true go to 2
+    - if rematch = false go to 1
 ]]
 
 --                                          Pseudocode: 
@@ -229,8 +231,20 @@ end
 -- Race Loop and Event Handling
 
 function RaceLoop()
-    -- Main race loop
-    -- Handle race events and checkpoints
+    while racestarted do
+        if racerunning == true then
+            -- Main race loop
+            elseif racefinished == true then -- break after race complete, proceed to data transfer
+                if playerishost then
+                -- set flag to "ready to recieve data"
+                -- set flags for data transmission
+                elseif playerisjoiner then
+                -- set flag to "sending data next"
+                -- set flags in sequence for data transmission
+                break
+            end
+        end
+    end
 end
 
 function monitorRaceProgress()                                  -- tbd
