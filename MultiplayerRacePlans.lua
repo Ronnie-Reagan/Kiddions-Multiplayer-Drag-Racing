@@ -61,7 +61,7 @@ local Flags = {
         HostWaiting = 1.04,
         HostYes = 1.05,
 	    HostNo = 1.06,
-        RaceStart = 1.01
+        RaceStart = 1.49
         -- Add other flags as needed
     },
     JoinerFlags = {                                                                 -- Range: 1.51 - 2.00 
