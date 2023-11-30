@@ -126,6 +126,7 @@ tbd = to be determined
 -- Start of the script
 --                                                Initialization
 -- Initialization and Menu Setup
+require_game_build(3028)
 mainmenu = menu.add_submenu("MULTIPLAYER RACE")
 local systemdelay = 0.25
 local raceavailable = false
@@ -135,13 +136,27 @@ local racefinished = false
 local playerishost = false
 local playerisjoiner = false
 local MYPED = localplayer:get_player_ped()
+local MYNAME = localplayer:get_player_name()
 local HostInfo = {}
 local JoinerInfo = {}
 local raceDataFilename = "race_data.json"
 local raceData = {}
 
--- Importing the Vehicle Groups
+-- Importing the Vehicle Groups and listing garages
 local CarGroups = require("scripts/vehicle_Groups")
+local properties = {
+	{offset = 0, size = 13, name = "Safehouse 1"},              	{offset = 13, size = 13, name = "Safehouse 2"},         {offset = 363, size = 50, name = "Eclipse Blvd Garage"},
+	{offset = 26, size = 13, name = "Safehouse 3"},             	{offset = 39, size = 13, name = "Safehouse 4"},     	{offset = 52, size = 13, name = "Safehouse 5"},
+	{offset = 65, size = 10, name = "Clubhouse"},               	{offset = 75, size = 13, name = "Safehouse 6"},         {offset = 88, size = 20, name = "Office Garage 1"},
+	{offset = 108, size = 20, name = "Office Garage 2"},        	{offset = 128, size = 20, name = "Office Garage 3"},   	{offset = 148, size = 8, name = "Underground Garage"},
+	{offset = 156, size = 1, name = "MOC Storage Bay"},         	{offset = 159, size = 20, name = "Hangar"},            	{offset = 179, size = 7, name = "Facility"},
+	{offset = 191, size = 1, name = "Nightclub Service Entrance"}, 	{offset = 192, size = 10, name = "Nightclub B2"},   	{offset = 202, size = 10, name = "Nightclub B3"},
+	{offset = 212, size = 10, name = "Nightclub B4"},   	        {offset = 223, size = 1, name = "Terrorbyte Storage"},	{offset = 227, size = 9, name = "Arena Workshop"},
+	{offset = 237, size = 9, name = "Arena Workshop B1"},	        {offset = 247, size = 9, name = "Arena Workshop B2"}, 	{offset = 258, size = 10, name = "Casino Penthouse"},
+	{offset = 268, size = 10, name = "Arcade"},         	        {offset = 278, size = 1, name = "Kosatka"},         	{offset = 281, size = 13, name = "Safehouse 7"},
+	{offset = 294, size = 13, name = "Safehouse 8"},    	        {offset = 307, size = 10, name = "Auto Shop"},          {offset = 317, size = 20, name = "Agency"},
+    {offset = 337, size = 13, name = "Safehouse 9"},                {offset = 350, size = 13, name = "Safehouse 10"}
+}
 
 -- Host and Joiner Flags
 local HostAccepts = 1.02
@@ -270,34 +285,28 @@ end
 
 
 function JoinRace()
-    MYPED:set_swim_speed(JoinerJoined)  -- Indicate that the joiner has joined the race
+    MYPED:set_swim_speed(JoinerJoined)          -- Indicate that the joiner has joined the race
     PrepareForRace()
 end
 
 function PrepareForRace()
-    MYPED:set_swim_speed(JoinerBusy)  -- Indicate that the joiner is preparing for the race
+    MYPED:set_swim_speed(JoinerBusy)            -- Indicate that the joiner is preparing for the race
     -- Final preparations for joiner
     -- Synchronize with host's start
 end
 
 function Readyup()
-    MYPED:set_swim_speed(JoinerReady)  -- Indicate that the joiner is ready
+    MYPED:set_swim_speed(JoinerReady)           -- Indicate that the joiner is ready
 end
 
 -- Main Race Loop
 function RaceLoop()
     while racestarted do
         if racerunning == true then
-            -- Main race loop
-            elseif racefinished == true then -- break after race complete, proceed to data transfer
-                if playerishost then
-                -- set flag to "ready to recieve data"
-                -- set flags for data transmission
-                elseif playerisjoiner then
-                -- set flag to "sending data next"
-                -- set flags in sequence for data transmission
-                break
-            end
+            showspeed()                         -- Main race loop
+            elseif racefinished == true then    -- break after race complete, proceed to data transfer
+                onRaceEnd()
+            break
         end
     end
 end
@@ -307,11 +316,13 @@ function getVehicleInfoFromPed(potentialHostPed)
     local vehicle = ped:get_current_vehicle()
     if vehicle then
         local modelHash = vehicle:get_model_hash()
-        return findCarInGroups(modelHash)
+        return findCarInGroups(modelHash)       -- fix the Functions
     else
         return nil, nil
     end
 end
+
+--[[        work on these:
 
 function findCarInGroups(modelHash)
     for _, group in pairs(CarGroups) do
@@ -324,36 +335,73 @@ function findCarInGroups(modelHash)
     return nil, nil  -- Car not found in groups
 end
 
+-- Function to find a car in the car groups by its model hash
+function findCarInGroups(modelHash)
+    -- Iterate over each group in the CarGroups
+    for groupID, group in pairs(CarGroups) do
+        -- Iterate over each car in the group
+        for hash, name in pairs(group) do
+            -- Check if the current car's hash matches the provided modelHash
+            if hash == modelHash then
+                return name, groupID            -- Return car name and group identifier
+            end
+        end
+    end
+    return nil, nil  -- Car not found in any group
+end
+]]
+
 -- Function to update race data with new race details
 function updateRaceDetails(newRaceDetails)
     table.insert(raceData, newRaceDetails)
-    saveRaceData()  -- Save the updated race data to file
+    saveRaceData()                              -- Save the updated race data to file
 end
 
--- Example usage of updateRaceDetails after a race
 function onRaceEnd()
-    local newRaceDetails = {
-        raceDistance = "your_race_distance",
-        raceLocation = "your_race_location",
-        winner = "winner's name",
-        timeDifference = "x seconds",
-        localPlayer = {
-            name = "local player's name",
-            vehicleModel = getVehicleNameFromHash(localPlayerVehicleHash),
-            finalSpeed = "local player's final speed",
-            time60Foot = "local player's 60 foot time",
-            reactionTime = "local player's reaction time"
-        },
-        opponent = {
-            name = "opponent's name",
-            vehicleModel = getVehicleNameFromHash(opponentVehicleHash),
-            finalSpeed = "opponent's final speed",
-            time60Foot = "opponent's 60 foot time",
-            reactionTime = "opponent's reaction time"
+    if playerishost then
+        local joinercarhash = JoinerInfo[vehicle]:get_model_hash()
+        local mycarhash = localplayer:get_current_vehicle():get_model_hash()
+        local newRaceDetails = {
+            raceDistance = "your_race_distance",
+            raceLocation = "your_race_location",
+            winner = "winner's name",
+            timeDifference = "x seconds",
+            localPlayer = {
+                name = "localplayer:get_player_name()",
+                vehicleModel = findCarInGroups(mycarhash),
+                finalSpeed = "local player's final speed",
+                time60Foot = "local player's 60 foot time",
+                reactionTime = "local player's reaction time"
+            },
+            opponent = {
+                name = "joinerinfo[name]",
+                vehicleModel = findCarInGroups(joinercarhash),
+                finalSpeed = "opponent's final speed",
+                time60Foot = "opponent's 60 foot time",
+                reactionTime = "opponent's reaction time"
+            }
         }
-    }
+        updateRaceDetails(newRaceDetails)
+    elseif playerisjoiner then
+        transmitTimes()
+    end
+end
 
-    updateRaceDetails(newRaceDetails)
+function transmittimes()
+    -- transmit race times via new flag system (to be invented)
+end
+
+function getjoinerVehicleHash()
+    local joinercar = JoinerInfo[ped]:get_current_vehicle()
+    local joinercarhash = joinercar:get_model_hash()
+    findCarInGroups(joinercarhash)
+
+end
+
+function getMyVehicleHash()
+    local mycar = MYPED:get_current_vehicle()
+    local mycarhash = mycar:get_model_hash()
+    findCarInGroups(mycarhash)
 end
 
 function offerRematch()                                         -- tbd
@@ -361,8 +409,46 @@ function offerRematch()                                         -- tbd
     -- Reset race conditions if both players agree
 end
 
--- Save File Management
+-- personal vehicle management
 
+-- get garages
+function get_garages()
+    local garages_list = {}
+    for i, prop in ipairs(properties) do
+        table.insert(garages_list, {name = prop.name, offset = prop.offset, size = prop.size})
+    end
+    return garages_list
+end
+
+function get_vehicle_id(id)
+    return globals.get_int(g.garages + 1 + id) - 1
+end
+
+function get_vehicle_hash(vehicleID)
+    local hashIndex = g.vehicle_slots + 1 + vehicleID * g.vehicle_slots_size + 66
+    return globals.get_int(hashIndex)
+end
+
+-- list owned personal vehicles per garage
+function list_cars_in_garage(garage)
+    local car_list = {}
+    local id_start = garage.offset
+    local id_end = garage.offset + garage.size - 1
+
+    for id = id_start, id_end do
+        local v = get_vehicle_id(id)
+        if v ~= -1 then
+            local hash = get_vehicle_hash(v)
+            if hash ~= 0 then
+                table.insert(car_list, {hash = hash, id = v})
+            end
+        end
+    end
+    return car_list
+end
+
+
+-- Save File Management
 function loadRaceData()
     local success, content = pcall(json.loadfile, raceDataFilename)
     if success then
@@ -381,7 +467,6 @@ function updateRaceDetails(newRaceDetails)
     table.insert(raceData, newRaceDetails)  -- Append new details to the race data table
     saveRaceData()  -- Save the updated race data to the file
 end
-
 
 --Initialization
 loadRaceData()
