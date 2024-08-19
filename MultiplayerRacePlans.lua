@@ -126,15 +126,21 @@ tbd = to be determined
 -- Start of the script
 --                                                Initialization
 -- Initialization and Menu Setup
-require_game_build(3028)
-mainmenu = menu.add_submenu("MULTIPLAYER RACE")
+local mainmenu = menu.add_submenu("MULTIPLAYER RACE")
+
+-- General Variables
+local speedMode = "KPH"
+local speedMultiplier = 3.5
 local systemdelay = 0.25
 local raceavailable = false
 local racerunning = false
 local racestarted = false
 local racefinished = false
 local playerishost = false
+local searchingForPlayer = false -- searching for player with JoinerSearching flag
+local waitingForPlayer = false   -- waiting for joiner to ready up
 local playerisjoiner = false
+local searchingForRace = false -- searching for player with HostingOpen flag
 local MYPED = localplayer:get_player_ped()
 local MYNAME = localplayer:get_player_name()
 local HostInfo = {}
@@ -144,7 +150,7 @@ local raceData = {}
 
 -- Importing the Vehicle Groups and listing garages
 local CarGroups = require("scripts/vehicle_Groups")
-local properties = {
+--[[local properties = {
 	{offset = 0, size = 13, name = "Safehouse 1"},              	{offset = 13, size = 13, name = "Safehouse 2"},         {offset = 363, size = 50, name = "Eclipse Blvd Garage"},
 	{offset = 26, size = 13, name = "Safehouse 3"},             	{offset = 39, size = 13, name = "Safehouse 4"},     	{offset = 52, size = 13, name = "Safehouse 5"},
 	{offset = 65, size = 10, name = "Clubhouse"},               	{offset = 75, size = 13, name = "Safehouse 6"},         {offset = 88, size = 20, name = "Office Garage 1"},
@@ -156,7 +162,7 @@ local properties = {
 	{offset = 268, size = 10, name = "Arcade"},         	        {offset = 278, size = 1, name = "Kosatka"},         	{offset = 281, size = 13, name = "Safehouse 7"},
 	{offset = 294, size = 13, name = "Safehouse 8"},    	        {offset = 307, size = 10, name = "Auto Shop"},          {offset = 317, size = 20, name = "Agency"},
     {offset = 337, size = 13, name = "Safehouse 9"},                {offset = 350, size = 13, name = "Safehouse 10"}
-}
+}]]
 
 -- Host and Joiner Flags
 local HostAccepts = 1.02
@@ -188,6 +194,11 @@ local HalfMile = 2.03
 local ThousandFoot = 2.04
 local FullMile = 2.05
 
+
+local hosterMenu = mainmenu:add_submenu("Host Race", function() HostRace() end)
+
+local joinerMenu = mainmenu:add_submenu("Join Race", function() SearchForRace() end)
+
 -- Host Functionality
 function HostRace()
     playerisjoiner = false
@@ -198,7 +209,8 @@ function HostRace()
 end
 
 function MonitorForJoiner()
-    while true do
+    searchingForPlayer = true
+    while searchingForPlayer do
         local numberOfPlayers = player.get_number_of_players()
         for i = 1, numberOfPlayers do
             local playerPed = player.get_player_ped(i)
@@ -213,8 +225,14 @@ function MonitorForJoiner()
                 }
 
                 local joinerId = playerPed:get_player_id()
-                HostAccepts(joinerId, playerPed)  -- Accept joiner and proceed
-                return  -- Exit the function after finding the joiner
+                hosterMenu:add_action("Accept Player: " .. tostring(name), function()
+                    HostAccept(joinerId, playerPed) -- Accept joiner and proceed
+                    searchingForPlayer = true
+                end)
+                hosterMenu:add_action("Keep Searching", function()
+                    JoinerInfo = {}
+                    MonitorForJoiner()
+                end)
             end
         end
         sleep(systemdelay)
@@ -224,33 +242,32 @@ end
 
 function HostAccept(joinerId, joinerPed)
     local carName, carGroup = getVehicleInfoFromPed(joinerPed)
-    -- Additional logic using carName and carGroup
-
+    JoinerInfo.vehicle = carName
     MYPED:set_swim_speed(HostAccepts)
     WaitForJoinerReady(joinerId)
 end
 
 function WaitForJoinerReady(joinerId)
     local joinerPed = player.get_player_ped(joinerId)
-    while true do
+    waitingForPlayer = true
+    while waitingForPlayer do
         if joinerPed:get_swim_speed() == JoinerReady then
             WaitForRaceStart()  -- Wait for the host to start the race
+            waitingForPlayer = false
             break
         end
         sleep(systemdelay)
     end
 end
 
-function WaitForRaceStart()
-    while not racestarted do
-        sleep(systemdelay)  -- Loop until racestarted is set to true
-    end
-    StartRace()  -- Start the race
+function promptRaceReadyToStart()
+    menu.register_hotkey(32, function() StartRace() end) -- spacebar
 end
 
-function StartRace()
+function StartRace()menu.remove_hotkey(32)
     MYPED:set_swim_speed(RaceStart)  -- Set the flag to "Race Started"
-    -- Synchronize the start between host and joiner
+    sleep(0.25) -- quarter second for latency
+    RaceLoopAsHost()
 end
 
 -- Joiner Functionality
@@ -262,7 +279,8 @@ function SearchForRace()
 end
 
 function FindRaceHost()
-    while playerisjoiner do
+    searchingForRace = true
+    while searchingForRace do
         local numberOfPlayers = player.get_number_of_players()
         for i = 1, numberOfPlayers do
             local playerPed = player.get_player_ped(i)
@@ -273,9 +291,11 @@ function FindRaceHost()
                     name = player.get_player_name(i),
                     vehicle = playerPed:get_current_vehicle()  -- Assuming you can get vehicle from the ped
                 }
-
-                JoinRace()  -- Join the race
-                return  -- Exit the function after finding the host
+                joinerMenu:add_action("Join pLayer: " .. HostInfo.name, function()
+                    JoinRace()
+                end)
+                searchingForRace = false
+                break
             end
         end
         sleep(systemdelay)
@@ -299,8 +319,17 @@ function Readyup()
     MYPED:set_swim_speed(JoinerReady)           -- Indicate that the joiner is ready
 end
 
+-- speedometer mock up
+function showspeed()
+    local veh = localplayer:get_current_vehicle()
+    local velocity = veh:get_velocity()
+    local speed = velocity * speedMultiplier
+    local stringToDisplay = tostring(speed) .. " " .. tostring(speedMode)
+    veh:set_number_plate_text(stringToDisplay)
+end
+
 -- Main Race Loop
-function RaceLoop()
+function RaceLoopAsHost()
     while racestarted do
         if racerunning == true then
             showspeed()                         -- Main race loop
@@ -312,7 +341,7 @@ function RaceLoop()
 end
 
 -- Vehicle Information Retrieval Functions
-function getVehicleInfoFromPed(potentialHostPed)
+function getVehicleInfoFromPed(ped)
     local vehicle = ped:get_current_vehicle()
     if vehicle then
         local modelHash = vehicle:get_model_hash()
@@ -320,19 +349,6 @@ function getVehicleInfoFromPed(potentialHostPed)
     else
         return nil, nil
     end
-end
-
---[[        work on these:
-
-function findCarInGroups(modelHash)
-    for _, group in pairs(CarGroups) do
-        for hash, name in pairs(group) do
-            if hash == modelHash then
-                return name, _  -- Return car name and group identifier
-            end
-        end
-    end
-    return nil, nil  -- Car not found in groups
 end
 
 -- Function to find a car in the car groups by its model hash
@@ -343,13 +359,12 @@ function findCarInGroups(modelHash)
         for hash, name in pairs(group) do
             -- Check if the current car's hash matches the provided modelHash
             if hash == modelHash then
-                return name, groupID            -- Return car name and group identifier
+                return name, groupID            -- Return car name and group index
             end
         end
     end
     return nil, nil  -- Car not found in any group
 end
-]]
 
 -- Function to update race data with new race details
 function updateRaceDetails(newRaceDetails)
@@ -470,3 +485,4 @@ end
 
 --Initialization
 loadRaceData()
+
